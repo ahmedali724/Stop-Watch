@@ -28,6 +28,8 @@ void TIMER1_CTC_Init(void) {
 	/* WGM12 = 1 => using mode 4 in timer1 (CTC) and compare match in OCR1A  */
 	/* (CS10 = 1 && CS12 = 1) => pre-scaler 1024 */
 	TCCR1B = (1 << WGM12) | (1 << CS10) | (1 << CS12);
+	/* start timer from 0 */
+	TCNT1 = 0;
 	/* set compare match value for 1 second */
 	OCR1A = 977;
 	/* enable output compare A match interrupt */
@@ -90,6 +92,7 @@ ISR(TIMER1_COMPA_vect) {
 
 ISR(INT0_vect) {
 	/* when external interrupt 0 triggered, the stop watch will be reset */
+	TCNT1 = 0;
 	seconds = 0;
 	minutes = 0;
 	hours = 0;
