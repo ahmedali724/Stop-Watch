@@ -1,0 +1,130 @@
+/*
+ ============================================================================
+ File Name   : Stop_Watch.c
+ Project     : Stop Watch (Mini Project 2)
+ Author      : Ahmed Ali
+ Date        : 12 Sept 2023
+ ============================================================================
+ */
+
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <util/delay.h>
+
+unsigned char seconds;
+unsigned char miunts;
+unsigned char hours;
+
+void TIMER1_CTC_Init(void) {
+	/*
+	 * F_CPU = 1Mhz, pre-scaler = 1024
+	 * F_Timer = 1Khz, Ttimer = 1msec
+	 * 1 second = 1000 mile second
+	 * for 1 second the compare match value will be 1000
+	 * and CTC mode
+	 * */
+	/*  force output compare for unit A (CTC) */
+	TCCR1A = (1 << FOC1A);
+	/* WGM12 = 1 => using mode 4 in timer1 (CTC) and compare match in OCR1A  */
+	/* (CS10 = 1 && CS12 = 1) => pre-scaler 1024 */
+	TCCR1B = (1 << WGM12) | (1 << CS10) | (1 << CS12);
+	/* set compare match value for 1 second */
+	OCR1A = 1000;
+	/* enable output compare A match interrupt */
+	TIMSK |= (1 << OCIE1A);
+	/* enable global interrupt */
+	SREG |= (1 << 7);
+}
+
+void INT0_Init_FalingEdge(void) {
+	/* (ISC01 = 1 && ISC00 = 0) => falling edge configuration */
+	MCUCR |= (1 << ISC01);
+	/* external interrupt request 0 enable */
+	GICR |= (1 << INT0);
+	/* define PD2 as input */
+	DDRD &= ~(1 << PD2);
+	/* internal pull-up resistor for PD2 */
+	PORTD |= (1 << PD2);
+}
+
+void INT1_Init_RisingEdge(void) {
+	/* (ISC10 = 1 && ISC11 = 1) => rising edge configuration */
+	MCUCR |= (1 << ISC10) | (1 << ISC11);
+	/* external interrupt request 1 enable */
+	GICR |= (1 << INT1);
+	/* define PD3 as input */
+	DDRD &= ~(1 << PD3);
+}
+
+void INT2_Init_FalingEdge(void) {
+	/* (ISC2 = 0) => falling edge configuration */
+	MCUCSR &= ~(1 << ISC2);
+	/* external interrupt request 2 enable */
+	GICR |= (1 << INT2);
+	/* define PB2 as input */
+	DDRB &= ~(1 << PB2);
+	/* internal pull-up resistor for PB2 */
+	PORTB |= (1 << PB2);
+}
+
+ISR(TIMER1_COMPA_vect) {
+	seconds++;
+	if (seconds == 60) {
+		miunts++;
+		seconds = 0;
+	}
+	if (miunts == 60) {
+		hours++;
+		miunts = 0;
+	}
+	if (hours == 99) {
+		seconds = 0;
+		miunts = 0;
+		hours = 0;
+	}
+}
+
+ISR(INT0_vect) {
+	seconds = 0;
+	miunts = 0;
+	hours = 0;
+}
+
+ISR(INT1_vect) {
+	TCCR1B &= (~(1 << CS10)) & (~(1 << CS12));
+}
+
+ISR(INT2_vect) {
+	TCCR1B = (1 << CS10) | (1 << CS12);
+}
+
+int main(void) {
+	DDRC |= 0x0F;
+	PORTC &= 0xF0;
+	DDRA |= 0x7F;
+	PORTA &= 0x80;
+	TIMER1_CTC_Init();
+	INT0_Init_FalingEdge();
+	INT1_Init_RisingEdge();
+	INT2_Init_FalingEdge();
+	while (1) {
+		PORTA = 0x20;
+		PORTC = (PORTC & 0xF0) | ((seconds % 10) & 0x0F);
+		_delay_ms(3);
+		PORTA = 0x10;
+		PORTC = (PORTC & 0xF0) | ((seconds / 10) & 0x0F);
+		_delay_ms(3);
+		PORTA = 0x08;
+		PORTC = (PORTC & 0xF0) | ((miunts % 10) & 0x0F);
+		_delay_ms(3);
+		PORTA = 0x04;
+		PORTC = (PORTC & 0xF0) | ((miunts / 10) & 0x0F);
+		_delay_ms(3);
+		PORTA = 0x002;
+		PORTC = (PORTC & 0xF0) | ((hours % 10) & 0x0F);
+		_delay_ms(3);
+		PORTA = 0x01;
+		PORTC = (PORTC & 0xF0) | ((hours / 10) & 0x0F);
+		_delay_ms(3);
+	}
+}
